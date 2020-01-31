@@ -24,11 +24,12 @@ void h_addmat(float*A, float*B, float*C, int nx, int ny)
 }
 
 __global__ void f_addmat( float*A, float*B, float*C, int nx, int ny) {
-	int ix = threadIdx.x + blockIdx.x*blockDim.x ;
-	int iy = threadIdx.y + blockIdx.y*blockDim.y ;
-	int idx = ix*ny + iy;
-	if ( (ix<nx) && (iy<ny))
+	int idx = threadIdx.x + blockIdx.x * blockDim.x;
+
+	while (idx < (nx*ny)) {
 		C[idx] = A[idx] + B[idx];
+		idx += blockDim.x * gridDim.x;
+	 }
 }
 
 int main( int argc, char *argv[] ) {
@@ -40,6 +41,11 @@ int main( int argc, char *argv[] ) {
 
 	int nx = atoi ( argv[1] );
 	int ny = atoi (argv[2] );
+	if (nx <= 0 || ny <= 0)
+	{
+		printf("invalid inputs\n");
+		exit(0);
+	}
 	int noElems = nx*ny;
 	int bytes = noElems * sizeof(float);
 	int i,j, count;
@@ -70,9 +76,9 @@ int main( int argc, char *argv[] ) {
 	cudaMemcpy( d_A, h_A, bytes, cudaMemcpyHostToDevice);
 	cudaMemcpy( d_B, h_B, bytes, cudaMemcpyHostToDevice);
 	double timeStampB = getTimeStamp();
-	dim3 block(128, 8);
-	dim3 grid((nx + block.x-1)/block.x, (ny+block.y-1)/block.y);
-	f_addmat<<<grid, block>>>( d_A, d_B, d_C, nx, ny);
+	//dim3 block(32, 32);
+	//dim3 grid((nx + block.x-1)/block.x, (ny+block.y-1)/block.y);
+	f_addmat<<<512, 512>>>( d_A, d_B, d_C, nx, ny);
 	cudaDeviceSynchronize();
 	double timeStampC = getTimeStamp();
 	cudaMemcpy(h_dC, d_C, bytes, cudaMemcpyDeviceToHost );
@@ -93,7 +99,7 @@ int main( int argc, char *argv[] ) {
 	}
 	if(s)
 	{
-		printf("total time is %f, CPU GPU transfer time is %f, kernel time is %f, GPU CPU transfer time is %f\n ", timeStampD-timeStampA, timeStampB - timeStampA, timeStampC- timeStampB, timeStampD - timeStampC);
+		printf("total time is %.6f, CPU GPU transfer time is %.6f, kernel time is %.6f, GPU CPU transfer time is %.6f\n ", timeStampD-timeStampA, timeStampB - timeStampA, timeStampC- timeStampB, timeStampD - timeStampC);
 		exit(0);
 	}
 	printf("finished");
